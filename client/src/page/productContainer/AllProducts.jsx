@@ -184,7 +184,7 @@ const AllProducts = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       cartHandler.addToCart(product);
-                      toastMessage.success(`${product.name} added to cart`);
+                      toastMessage("success",`${product.name} added to cart`);
                     }}
                   >
                     Add to Cart

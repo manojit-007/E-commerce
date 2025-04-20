@@ -20,7 +20,7 @@ const ProductPage = () => {
 
   const addToCart = (product) => {
     console.log(product);
-    const { name, image, price, _id: productId, } = product;
+    const { name, image, price, _id: productId } = product;
     //destructuring the product object for backend
     const item = {
       name,
