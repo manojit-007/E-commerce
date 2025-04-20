@@ -11,15 +11,15 @@ import ProductRouter from "./routes/productRoute.js";
 import ImageRouter from "./routes/imageRoute.js";
 import OrderRoute from "./routes/orderRoute.js";
 import responseHandler from "./utils/responseHandler.js";
-// import Stripe from "stripe";
 import PaymentRouter from "./routes/paymentRoute.js";
 
 dotenv.config();
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.ORIGIN,
+    origin: process.env.ORIGIN || "http://localhost:3000", // Add default for local development
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
     allowedHeaders: [
@@ -31,16 +31,14 @@ const io = new Server(server, {
   },
 });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {});
-
-// Middleware
+// Middleware to parse JSON and URL-encoded data
 app.use(express.json());
 app.use(urlencoded({ extended: true }));
+
+// CORS Configuration
 app.use(
   cors({
-    origin: process.env.ORIGIN,
+    origin: process.env.ORIGIN || "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
     allowedHeaders: [
@@ -70,36 +68,41 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => console.log("❌ Client disconnected"));
 });
 
-// Pass `io` to product routes
+// Pass `io` to product and order routes
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
-app.use((err, req, res, next) => {
-  console.log(err);
-  responseHandler(
-    res,
-    err?.status || 500,
-    err.message || "Internal Server Error"
-  );
-});
 
+// Register Routers
 app.use("/image", ImageRouter);
 app.use("/payment", PaymentRouter);
 app.use("/user", UserRouter);
-app.use("/product", ProductRouter(io)); // Pass `io` here
+app.use("/product", ProductRouter(io));
 app.use("/order", OrderRoute(io));
 
 // Serve frontend files (for production deployment)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 app.use(express.static(path.join(__dirname, "public")));
 
-// Handle unhandled routes
+// Root and Fallback Routes
 app.all("/", (req, res) =>
   res.status(200).json({ message: "Welcome! API server is up and running." })
 );
 app.all("*", (req, res) =>
   res.status(404).json({ message: "❌ Route not found." })
 );
+
+// Error Handling Middleware
+app.use((err, req, res, next) => {
+  console.error("Unhandled Error:", err.message || err);
+  responseHandler(
+    res,
+    err.status || 500,
+    err.message || "Internal Server Error"
+  );
+});
 
 // Start Server
 const PORT = process.env.PORT || 5000;
