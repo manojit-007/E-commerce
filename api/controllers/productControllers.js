@@ -259,6 +259,54 @@ const getAllProducts = catchAsyncError(async (req, res, next) => {
   });
 });
 
+//add review
+
+const productReview = catchAsyncError(async (req, res, next) => {
+  const userId = req.user.id;
+  const { productId, orderId, username, rating, comment } = req.body;
+  // console.log(productId, orderId, username, rating, comment,userId);
+  const review = {
+    user: userId,
+    orderId,
+    username,
+    rating: Number(rating),
+    comment,
+  };
+
+  const product = await Product.findById(productId);
+  if (!product) {
+    return res
+      .status(404)
+      .json({ message: "Product not found", success: false });
+  }
+
+  const isReviewed = product.reviews.find(
+    (rev) => rev.orderId.toString() === orderId.toString()
+  );
+
+  if (isReviewed) {
+    product.reviews.forEach((rev) => {
+      if (rev.orderId.toString() === orderId.toString()) {
+        rev.rating = review.rating;
+        rev.comment = review.comment;
+      }
+    });
+    await product.save();
+  } else {
+    product.reviews.push(review);
+    product.numOfReviews = product.reviews.length;
+  }
+
+  // Calculate average rating
+  const totalRating = product.reviews.reduce((acc, rev) => acc + rev.rating, 0);
+  product.ratings = totalRating / product.reviews.length;
+
+  await product.save();
+  return responseHandler(res, 200, "Review submitted successfully.", {
+    product,
+  });
+});
+
 export {
   createProduct,
   adminListedProducts,
@@ -268,4 +316,5 @@ export {
   updateProduct,
   sellerListedProducts,
   deleteProductById,
+  productReview
 };

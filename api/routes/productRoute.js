@@ -6,6 +6,7 @@ import {
   deleteProductById,
   getAllProducts,
   getProductById,
+  productReview,
   sellerListedProducts,
   updateProduct,
 } from "../controllers/productControllers.js";
@@ -62,6 +63,13 @@ const ProductRouter = (io) => {
     verifyToken,
     verifyRole("admin", "seller"),
     deleteProductById
+  );
+
+  router.post(
+    "/review",
+    verifyToken,
+    verifyRole("admin", "seller", "user"),
+    productReview
   );
 
   return router;
