@@ -23,7 +23,7 @@ const ProductRouter = (io) => {
   );
 
   /** ----------------------- Product Retrieval ----------------------- */
-  router.get("/allProducts", allProducts); // Publicly accessible
+  router.get("/allProducts",  getAllProducts); // Publicly accessible
 
   router.get(
     "/adminProducts",
@@ -43,7 +43,7 @@ const ProductRouter = (io) => {
     "/allAdminOrSellerProducts",
     verifyToken,
     verifyRole("admin", "seller"),
-    getAllProducts
+    allProducts
   );
 
   router.get("/:productId", getProductById); // Publicly accessible

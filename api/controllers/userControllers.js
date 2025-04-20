@@ -211,6 +211,41 @@ const getAllUsers = catchAsyncError(async (req, res) => {
   return responseHandler(res, 200, "Users fetched successfully", { users });
 });
 
+// update address
+const updateAddress = catchAsyncError(async (req, res) => {
+  console.log(req.user);
+  const id = req.user.id; // Assuming the user ID is passed as a route parameter
+  const { street, city, state, zip } = req.body; // Expecting address fields in the request body
+
+  if (!id) {
+    return res.status(400).json({
+      success: false,
+      message: "User ID is required",
+    });
+  }
+
+  const updatedFields = {};
+  if (street !== undefined) updatedFields["address.street"] = street;
+  if (city !== undefined) updatedFields["address.city"] = city;
+  if (state !== undefined) updatedFields["address.state"] = state;
+  if (zip !== undefined) updatedFields["address.zip"] = zip;
+
+  const user = await User.findByIdAndUpdate(
+    id,
+    { $set: updatedFields },
+    { new: true, runValidators: true } // Returns the updated document
+  );
+
+  if (!user) {
+    return responseHandler(res, 404, "User not found");
+  }
+
+  return responseHandler(res, 200, "Address updated successfully",{address : {street, city, state, zip}})
+});
+
+
+
+
 export {
   registerUser,
   logIn,
@@ -221,4 +256,5 @@ export {
   getUserDetails,
   getUserById,
   getAllUsers,
+  updateAddress
 };

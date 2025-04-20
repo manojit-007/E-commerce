@@ -4,9 +4,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { logOutUser } from "@/redux-store/auth/authThunkFunctions";
 import { useNavigate } from "react-router-dom";
+import AddressForm from "@/page/authContainer/addressForm";
+import PasswordUpdate from "./passwordUpdate";
 
 const Loader = ({ message }) => (
   <div className="flex items-center justify-center min-h-screen">
@@ -30,10 +31,11 @@ const ErrorComponent = ({ message, onRetry }) => (
   </div>
 );
 
+
 const Profile = () => {
-  const { user, isAdmin,isSeller,loading, error } = useSelector((state) => state.auth);
+  const { user, isAdmin, isSeller, loading, error } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   if (loading) return <Loader message="Loading profile..." />;
   if (error)
@@ -55,144 +57,67 @@ const Profile = () => {
           <TabsTrigger value="address">Address</TabsTrigger>
         </TabsList>
 
+        {/* Profile Tab */}
         <TabsContent value="profile">
-  <section className="p-8 bg-white dark:bg-gray-900 rounded-xl shadow-lg max-w-md mx-auto">
-    <div className="flex flex-col items-center">
-      {/* User Avatar */}
-      <div className="flex w-24 h-24 items-center justify-center bg-blue-500 rounded-full shadow-md">
-        <User className="w-16 h-16 text-white" />
-      </div>
-
-      {/* User Info */}
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mt-4">
-        {user.name}
-      </h1>
-      <p className="text-gray-500 dark:text-gray-400">{user.email}</p>
-      <p className="text-gray-600 dark:text-gray-300 capitalize">{user.role}</p>
-      <p className="text-gray-400 dark:text-gray-500 mt-2">
-        Joined on{" "}
-        {new Date(user.createdAt).toLocaleDateString(undefined, {
-          year: "numeric",
-          month: "long",
-          day: "numeric",
-        })}
-      </p>
-
-      {/* Dashboard Buttons */}
-      <div className="mt-6 space-y-4 w-full">
-        {isAdmin && (
-          <Button
-            onClick={() => navigate("/admin/dashboard")}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 rounded-md"
-          >
-            Admin Dashboard
-          </Button>
-        )}
-        {isSeller && (
-          <Button
-            onClick={() => navigate("/seller/dashboard")}
-            className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-2 rounded-md"
-          >
-            Seller Dashboard
-          </Button>
-        )}
-        <Button
-          onClick={() => dispatch(logOutUser())}
-          className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-md"
-        >
-          Logout
-        </Button>
-      </div>
-    </div>
-  </section>
-</TabsContent>
-
-
-        <TabsContent value="password">
-          <section className="p-6 bg-white rounded-lg shadow-lg">
-            <h2 className="text-xl font-bold mb-4">Change Password</h2>
-            <form>
-              <Input
-                type="password"
-                placeholder="Current Password"
-                className="mb-4"
-                required
-              />
-              <Input
-                type="password"
-                placeholder="New Password"
-                className="mb-4"
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Confirm Password"
-                className="mb-4"
-                required
-              />
-              <Button className="w-full bg-blue-500 text-white hover:bg-blue-600">
-                Update Password
-              </Button>
-            </form>
+          <section className="p-8 bg-white rounded-xl shadow-lg">
+            <div className="flex flex-col items-center">
+              <div className="w-24 h-24 bg-blue-500 rounded-full shadow-md flex items-center justify-center">
+                <User className="w-16 h-16 text-white" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-800 mt-4">
+                {user.name}
+              </h1>
+              <p className="text-gray-500">{user.email}</p>
+              <p className="text-gray-600 capitalize">{user.role}</p>
+              <p className="text-gray-400 mt-2">
+                Joined on{" "}
+                {new Date(user.createdAt).toLocaleDateString(undefined, {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
+              <div className="mt-6 w-full space-y-4">
+                {isAdmin && (
+                  <Button
+                    onClick={() => navigate("/admin/dashboard")}
+                    className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                  >
+                    Admin Dashboard
+                  </Button>
+                )}
+                {isSeller && (
+                  <Button
+                    onClick={() => navigate("/seller/dashboard")}
+                    className="w-full bg-green-500 hover:bg-green-600 text-white"
+                  >
+                    Seller Dashboard
+                  </Button>
+                )}
+                <Button
+                  onClick={() => dispatch(logOutUser())}
+                  className="w-full bg-red-500 hover:bg-red-600 text-white"
+                >
+                  Logout
+                </Button>
+              </div>
+            </div>
           </section>
         </TabsContent>
 
+        {/* Password Tab */}
+        <TabsContent value="password">
+          <section className="p-6 bg-white rounded-lg shadow-lg">
+            <h2 className="text-xl font-bold mb-4">Change Password</h2>
+           <PasswordUpdate />
+          </section>
+        </TabsContent>
+
+        {/* Address Tab */}
         <TabsContent value="address">
           <section className="p-6 bg-white rounded-lg shadow-lg">
             <h2 className="text-xl font-bold mb-4">Manage Address</h2>
-            <form>
-              <div className="mb-4">
-                <label htmlFor="street" className="block text-gray-700 mb-2">
-                  Street
-                </label>
-                <Input
-                  id="street"
-                  type="text"
-                  placeholder="Street Address"
-                  defaultValue={user.address?.street || ""}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="city" className="block text-gray-700 mb-2">
-                  City
-                </label>
-                <Input
-                  id="city"
-                  type="text"
-                  placeholder="City"
-                  defaultValue={user.address?.city || ""}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="state" className="block text-gray-700 mb-2">
-                  State
-                </label>
-                <Input
-                  id="state"
-                  type="text"
-                  placeholder="State"
-                  defaultValue={user.address?.state || ""}
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label htmlFor="zip" className="block text-gray-700 mb-2">
-                  ZIP Code
-                </label>
-                <Input
-                  id="zip"
-                  type="text"
-                  placeholder="ZIP Code"
-                  defaultValue={user.address?.zip || ""}
-                  required
-                />
-              </div>
-              <Button className="w-full bg-blue-500 text-white hover:bg-blue-600">
-                Update Address
-              </Button>
-            </form>
+            <AddressForm user={user} />
           </section>
         </TabsContent>
       </Tabs>

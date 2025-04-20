@@ -81,3 +81,32 @@ export const checkAuthStatus = createAsyncThunk(
     }
   }
 );
+
+
+// AsyncThunk: Update Address
+export const updateAddress = createAsyncThunk(
+  "auth/updateAddress",
+  async (address, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.post("/user/updateAddress", address);
+      return response.data; // Contains updated address
+    } catch (error) {
+      console.error("Update Address Error:", error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || "Failed to update address");
+    }
+  }
+);
+
+// AsyncThunk: Update Password
+export const updatePassword = createAsyncThunk(
+  "auth/updatePassword",
+  async (passwordData, { rejectWithValue }) => {
+    try {
+      const response = await apiClient.post("/user/updatePassword", passwordData);
+      return response.data; // Return success data
+    } catch (error) {
+      console.error("Update Password Error:", error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || "Failed to update password");
+    }
+  }
+);

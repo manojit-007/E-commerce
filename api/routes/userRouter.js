@@ -9,7 +9,8 @@ import {
   getUserById,
   logoutUser,
   getAllUsers,
-  updatePassword
+  updatePassword,
+  updateAddress
 } from "../controllers/userControllers.js";
 import { verifyRole, verifyToken } from "../middleware/jsonWebToken.js";
 
@@ -20,9 +21,10 @@ const router = express.Router();
 router.post("/register", registerUser);
 router.post("/login", logIn);
 router.post("/forgot-password", forgotPassword);
-router.post("/updatePassword", updatePassword);
+router.post("/updatePassword",verifyToken, updatePassword);
 router.put("/password/reset/:resetToken", resetPassword);
 router.post("/logout", logoutUser);
+router.post("/updateAddress", verifyToken,updateAddress);
 
 // 🔒 Protected Routes (Requires Authentication)
 router.get("/profile", verifyToken, getUserDetails);

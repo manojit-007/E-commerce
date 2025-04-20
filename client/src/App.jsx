@@ -12,6 +12,7 @@ import Profile from "./page/authContainer/profile";
 import Order from "./page/order/order";
 import AllOrders from "./page/order/allOrders";
 import Product from "./page/productContainer/product";
+import NavigationMenu from "./page/navigation/navigationMenu";
 
 const Home = lazy(() => import("./page/homeContainer/Home"));
 const Login = lazy(() => import("./page/authContainer/Login"));
@@ -59,6 +60,7 @@ function App() {
   return (
     <main className="min-h-screen flex flex-col">
       <Suspense fallback={<Loader aria-label="Loading content..." />}>
+      <NavigationMenu/>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
