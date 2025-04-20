@@ -36,6 +36,10 @@ const orderSlice = createSlice({
       state.order = null; // Clear order from state if Cash on Delivery is selected
       localStorage.removeItem("order"); // Clear order from localStorage
     },
+    completePayment: (state) => {
+      state.order = null; // Clear order from state if Cash on Delivery is selected
+      localStorage.removeItem("order"); // Clear order from localStorage
+    },
   },
   extraReducers: (builder) => {
     // Create Order cases
@@ -95,5 +99,5 @@ const orderSlice = createSlice({
   },
 });
 
-export const { resetError, resetOrder, cashOnDelivery } = orderSlice.actions;
+export const { resetError, resetOrder, cashOnDelivery,completePayment } = orderSlice.actions;
 export default orderSlice.reducer;

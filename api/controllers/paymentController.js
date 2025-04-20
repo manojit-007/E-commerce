@@ -1,75 +1,81 @@
 import Stripe from "stripe";
+import catchAsyncError from "../middleware/catchAsyncError.js";
+import Order from "../data_models/orderModels.js";
+import responseHandler from "../utils/responseHandler.js";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Create Payment Intent
-export const createPaymentIntent = async (req, res) => {
+export const createPaymentIntent = catchAsyncError(async (req, res, next) => {
   try {
     const { totalPrice, orderId, userId } = req.body;
 
-    // Validate input data
-    if (!totalPrice || isNaN(totalPrice) || totalPrice <= 0) {
-      return res.status(400).json({ error: "Invalid totalPrice." });
-    }
-    if (!orderId || typeof orderId !== "string") {
-      return res.status(400).json({ error: "Invalid orderId." });
-    }
-    if (!userId || typeof userId !== "string") {
-      return res.status(400).json({ error: "Invalid userId." });
+    if (!totalPrice || !orderId || !userId) {
+      return res.status(400).json({ message: "All fields are required." });
     }
 
-    // Convert the price to cents for Stripe
-    const amount = Math.round(totalPrice * 100);
-
-    // Create a Payment Intent
     const paymentIntent = await stripe.paymentIntents.create({
-      amount, // Amount in cents
+      amount: totalPrice * 100,
       currency: "usd",
       payment_method_types: ["card"],
+      description: `Payment for Order ID: ${orderId}`,
+      metadata: {
+        orderId,
+        userId,
+      },
     });
+    // console.log(paymentIntent.client_secret);
 
-    // Send the client secret back to the frontend
-    res.status(200).json({ clientSecret: paymentIntent.client_secret });
+    return responseHandler(res, 200, "Payment Intent created successfully.", {
+      clientSecret: paymentIntent.client_secret,
+    });
   } catch (error) {
-    console.error("Error creating payment intent:", error.message);
-    res.status(500).json({
-      error: "Failed to create Payment Intent",
-      message: error.message,
+    console.log(error.message);
+    return responseHandler(res, 500, "Internal server error.", {
+      error: error.message || "An unknown error occurred.",
     });
   }
-};
+});
 
 // Verify Payment
-export const verifyPayment = async (req, res) => {
+export const verifyPayment = catchAsyncError(async (req, res, next) => {
   try {
     const { paymentIntentId } = req.body;
 
     if (!paymentIntentId) {
-      return res.status(400).json({ error: "Missing paymentIntentId." });
+      return res
+        .status(400)
+        .json({ message: "Payment Intent ID is required." });
     }
 
-    // Retrieve the Payment Intent from Stripe
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    // console.log("paymentIntent ID",paymentIntent.id);
 
-    // Check the status of the payment
     if (paymentIntent.status === "succeeded") {
-      res.status(200).json({
-        success: true,
-        message: "Payment successful",
-        paymentDetails: paymentIntent,
+      // Here you can update your order status in the database
+      const orderId = paymentIntent.metadata.orderId;
+      const userId = paymentIntent.metadata.userId;
+      // Update order status in your database
+      const order = await Order.findById(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found." });
+      }
+      order.paymentInfo.id = paymentIntent.id;
+      order.paymentInfo.status = paymentIntent.status || "paid";
+      order.save();
+      responseHandler(res, 200, "Payment verified successfully", {
+        paymentIntent,
       });
     } else {
       res.status(400).json({
         success: false,
-        message: `Payment not successful. Current status: ${paymentIntent.status}`,
-        paymentDetails: paymentIntent,
+        message: "Payment verification failed",
       });
     }
   } catch (error) {
-    console.error("Error verifying payment:", error.message);
-    res.status(500).json({
-      error: "Failed to verify payment",
-      message: error.message,
+    console.log(error.message);
+    return responseHandler(res, 500, "Internal server error.", {
+      error: error.message || "An unknown error occurred.",
     });
   }
-};
+});

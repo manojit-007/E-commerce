@@ -87,7 +87,7 @@ const updatePassword = catchAsyncError(async (req, res, next) => {
   }
 
   // Compare old password
-  console.log("User's current hashed password:", user.password);
+  // console.log("User's current hashed password:", user.password);
   const isPasswordMatched = await decryptPassword(password, user.password);
 
   if (!isPasswordMatched) {
@@ -101,7 +101,7 @@ const updatePassword = catchAsyncError(async (req, res, next) => {
 
   // Encrypt and save the new password
   user.password = await encryptPassword(newPassword);
-  console.log("Updated hashed password:", user.password);
+  // console.log("Updated hashed password:", user.password);
   await user.save();
 
   // Generate new token

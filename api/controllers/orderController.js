@@ -12,12 +12,12 @@ import socketEvent from "../utils/socketEvent.js";
 const createOrder = (io) =>
   catchAsyncError(async (req, res, next) => {
     const { shippingInfo, orderItems, paymentInfo, sellerId } = req.body;
-    console.log({shippingInfo, orderItems, paymentInfo});
+    // console.log({shippingInfo, orderItems, paymentInfo});
     const processedPaymentInfo = paymentInfo && Object.keys(paymentInfo).length > 0
     ? paymentInfo
     : {
-        id: `payment_${Date.now()}`, // Use a unique default ID
-        status: "Pending",          // Default status
+        id: `cash_on_delivery_${Date.now()}`,
+        status: "Pending",        
       };
   
     if (!shippingInfo ) {
@@ -42,8 +42,8 @@ const createOrder = (io) =>
         restCartItems.push(item);
       } else if (product.quantity > 0 && product.quantity < item.quantity) {
         // Partial stock available
-        const fulfilledQuantity = product.quantity; // Fulfill as much as available
-        const remainingQuantity = item.quantity - fulfilledQuantity; // Remaining quantity to be added to restCartItems
+        const fulfilledQuantity = product.quantity; 
+        const remainingQuantity = item.quantity - fulfilledQuantity;
 
         // Reduce product stock to zero
         product.quantity = 0;
@@ -83,7 +83,7 @@ const createOrder = (io) =>
         restCartItems.push(item);
       }
     }
-    console.log(orderCartItems);
+    // console.log(orderCartItems);
 
     // Proceed with order creation logic
     if (orderCartItems.length === 0) {
@@ -113,7 +113,7 @@ const createOrder = (io) =>
       totalPrice,
     });
 
-    console.log(order);
+    // console.log(order);
 
     // Send confirmation email asynchronously
     (async () => {

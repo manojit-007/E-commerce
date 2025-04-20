@@ -139,37 +139,7 @@ const getProductById = catchAsyncError(async (req, res, next) => {
   return responseHandler(res, 200, "Product fetched successfully.", { product });
 });
 
-// const updateProduct = catchAsyncError(async (req, res, next) => {
-//   // async (req, res) => {
-//     const { productId } = req.params;
-//     const product = await Product.findById(productId);
-
-//     if (!product) {
-//       return res.status(404).json({ message: "Product not found." });
-//     }
-
-//     // Your logic to update the product fields
-//     const allowedUpdates = ["name", "description", "price", "quantity", "image"];
-//     const updates = req.body;
-
-//     Object.keys(updates).forEach((key) => {
-//       if (allowedUpdates.includes(key)) {
-//         product[key] = updates[key];
-//       }
-//     });
-
-//     await product.save();
-//     const io = req.io;
-
-//     // Emit product update via socket.io
-//     io.emit("productUpdate", { id: product._id, ...product.toObject() });
-
-//     res.json({ message: "Product updated successfully", product });
-//   // }
-
-//   // return responseHandler(res, 200, "Product updated successfully.", { product });
-// });
-
+// Update Product - seller + admin
 const updateProduct = (io) =>
   catchAsyncError(async (req, res, next) => {
     const { productId } = req.params;
