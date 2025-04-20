@@ -11,12 +11,12 @@ import Cart from "./page/cart/cart";
 import Profile from "./page/authContainer/profile";
 import Order from "./page/order/order";
 import AllOrders from "./page/order/allOrders";
+import Product from "./page/productContainer/product";
 
 const Home = lazy(() => import("./page/homeContainer/Home"));
 const Login = lazy(() => import("./page/authContainer/Login"));
 const Register = lazy(() => import("./page/authContainer/Register"));
 const ProductPage = lazy(() => import("./page/productContainer/ProductPage"));
-const Product = lazy(() => import("./page/productContainer/Product"));
 const NotFound = lazy(() => import("./page/errorContainer/NotFound"));
 
 const PrivateRoute = ({ children, allowedRoles = [] }) => {
