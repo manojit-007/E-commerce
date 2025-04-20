@@ -15,8 +15,8 @@ const SendEmail = async (options) => {
     from: process.env.SMPT_MAIL,
     to: options.email,
     subject: options.subject,
-    html: options.isHtml ? options.message : undefined, // Use 'html' if HTML content is provided
-    text: !options.isHtml ? options.message : undefined, // Fallback to 'text' if not sending HTML
+    html: options.isHtml ? options.message : undefined, 
+    text: !options.isHtml ? options.message : undefined, 
   };
 
   await transporter.sendMail(mailOptions);
