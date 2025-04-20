@@ -17,6 +17,7 @@ import { toastMessage } from "@/utils/tostMessage";
 import { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 
 const AllProducts = () => {
   const { keyword } = useParams();
@@ -184,7 +185,7 @@ const AllProducts = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       cartHandler.addToCart(product);
-                      toastMessage("success",`${product.name} added to cart`);
+                      toast.success(`${product.name} added to cart`);
                     }}
                   >
                     Add to Cart

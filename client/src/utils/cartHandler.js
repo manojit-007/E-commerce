@@ -2,7 +2,9 @@ import { toastMessage } from "./tostMessage";
 
 export const cartHandler = {
   addToCart: (product) => {
+    console.log(product);
     const { name, image, price, _id: productId, seller } = product;
+    console.log(name, image, price, productId, seller);
 
     // Destructure the product object and prepare the item for the cart
     const item = {

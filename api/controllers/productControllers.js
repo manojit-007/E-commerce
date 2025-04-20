@@ -247,7 +247,7 @@ const getAllProducts = catchAsyncError(async (req, res, next) => {
     .sort(sortOption)
     .skip(skip)
     .limit(perPage)
-    .select("name price category image quantity description createdAt");
+    .select("name price category image quantity description createdAt seller");
 
   const productCount = await Product.countDocuments(query);
 
