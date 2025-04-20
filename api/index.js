@@ -38,7 +38,19 @@ const __dirname = path.dirname(__filename);
 // Middleware
 app.use(express.json());
 app.use(urlencoded({ extended: true }));
-app.use(cors({ origin: "http://localhost:5173", credentials: true }));
+app.use(
+  cors({
+    origin: process.env.ORIGIN,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
+    allowedHeaders: [
+      "Origin",
+      "X-Requested-With",
+      "Content-Type",
+      "Authorization",
+    ],
+  })
+);
 
 // MongoDB Connection
 async function connectDB() {
@@ -65,15 +77,18 @@ app.use((req, res, next) => {
 });
 app.use((err, req, res, next) => {
   console.log(err);
-  responseHandler(res, err?.status || 500, err.message || "Internal Server Error");
+  responseHandler(
+    res,
+    err?.status || 500,
+    err.message || "Internal Server Error"
+  );
 });
-
 
 app.use("/image", ImageRouter);
 app.use("/payment", PaymentRouter);
 app.use("/user", UserRouter);
 app.use("/product", ProductRouter(io)); // Pass `io` here
-app.use("/order", OrderRoute(io)); 
+app.use("/order", OrderRoute(io));
 
 // Serve frontend files (for production deployment)
 app.use(express.static(path.join(__dirname, "public")));
