@@ -1,0 +1,13 @@
+.animateChangeColor{
+    background: #000;
+    animation: pop 2s  infinite linear ;
+}
+
+@keyframes pop{
+    0%,100%{
+        background: #000;
+    } 
+    50%{
+        background: white;
+    }
+}
