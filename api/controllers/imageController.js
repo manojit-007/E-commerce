@@ -21,12 +21,7 @@ const uploadImage = catchAsyncError(async (req, res, next) => {
     // Cleanup the temporary file
     fs.unlink(inputPath, (err) => {
       if (err) {
-        console.error(
-          `Error deleting temporary file at ${inputPath}:`,
-          err.message
-        );
-      } else {
-        // console.log(`Deleted temporary file at ${inputPath}`);
+        console.error(`Error deleting temporary file at ${inputPath}:`, err.message);
       }
     });
 
@@ -46,7 +41,6 @@ const uploadImage = catchAsyncError(async (req, res, next) => {
 // Delete Image Handler
 const deleteImage = catchAsyncError(async (req, res, next) => {
   const { public_id } = req.body;
-  // console.log("public_id", public_id);
 
   if (!public_id) {
     return responseHandler(res, 400, "Public ID is required.");
@@ -54,7 +48,6 @@ const deleteImage = catchAsyncError(async (req, res, next) => {
 
   try {
     const result = await cloudinary.uploader.destroy(public_id);
-    // // console.log(result);
 
     if (result.result !== "ok") {
       return responseHandler(res, 400, "Failed to delete image.");

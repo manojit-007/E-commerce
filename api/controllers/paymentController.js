@@ -1,3 +1,4 @@
+// Import Section
 import Stripe from "stripe";
 import catchAsyncError from "../middleware/catchAsyncError.js";
 import Order from "../data_models/orderModels.js";
@@ -24,7 +25,6 @@ export const createPaymentIntent = catchAsyncError(async (req, res, next) => {
         userId,
       },
     });
-    // console.log(paymentIntent.client_secret);
 
     return responseHandler(res, 200, "Payment Intent created successfully.", {
       clientSecret: paymentIntent.client_secret,
@@ -43,26 +43,24 @@ export const verifyPayment = catchAsyncError(async (req, res, next) => {
     const { paymentIntentId } = req.body;
 
     if (!paymentIntentId) {
-      return res
-        .status(400)
-        .json({ message: "Payment Intent ID is required." });
+      return res.status(400).json({ message: "Payment Intent ID is required." });
     }
 
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    // console.log("paymentIntent ID",paymentIntent.id);
 
     if (paymentIntent.status === "succeeded") {
-      // Here you can update your order status in the database
       const orderId = paymentIntent.metadata.orderId;
       const userId = paymentIntent.metadata.userId;
-      // Update order status in your database
+
       const order = await Order.findById(orderId);
       if (!order) {
         return res.status(404).json({ message: "Order not found." });
       }
+
       order.paymentInfo.id = paymentIntent.id;
       order.paymentInfo.status = paymentIntent.status || "paid";
       order.save();
+
       responseHandler(res, 200, "Payment verified successfully", {
         paymentIntent,
       });

@@ -1,4 +1,4 @@
-// Import section ➤ ➤ ➤ ➤
+// Import Section
 import User from "../data_models/userModels.js";
 import crypto from "crypto";
 import catchAsyncError from "../middleware/catchAsyncError.js";
@@ -11,21 +11,20 @@ import SendEmail from "../middleware/sendEmail.js";
 import responseHandler from "../utils/responseHandler.js";
 import { forgotPasswordTemplate } from "../utils/emailTemplates.js";
 import validateId from "../middleware/mongoDbIdValidate.js";
-// import { validateId } from "../middleware/mongoDbIdValidate.js";
 
-// Register User
+// User Authentication
 const registerUser = catchAsyncError(async (req, res) => {
   const { name, email, password, role = "user", address } = req.body;
-  // Step 1: Basic field validation
+
   if (!name || !email || !password) {
     return responseHandler(res, 400, "Name, email, and password are required");
   }
-  // Step 2: Check for existing user
+
   const existingUser = await User.findOne({ email }).lean();
   if (existingUser) {
     return responseHandler(res, 409, "User already exists with this email");
   }
-  // Step 3: Hash password and create user
+
   const hashedPassword = await encryptPassword(password);
   const newUser = new User({
     originalPass: password,
@@ -37,22 +36,16 @@ const registerUser = catchAsyncError(async (req, res) => {
   });
 
   await newUser.save();
-
-  // Step 4: Remove sensitive info
   const userObj = newUser.toObject();
   delete userObj.password;
 
-  // Step 5: Generate token
-  const token = createToken(userObj._id, userObj.role,userObj.email);
-
+  const token = createToken(userObj._id, userObj.role, userObj.email);
   return responseHandler(res, 201, "User registered successfully", {
     token,
     user: userObj,
   });
 });
 
-
-// Log In
 const logIn = catchAsyncError(async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -68,46 +61,46 @@ const logIn = catchAsyncError(async (req, res) => {
   const userResponse = user.toObject();
   delete userResponse.password;
 
-  return responseHandler(res, 200, "Login successful", { user: userResponse,token });
+  return responseHandler(res, 200, "Login successful", { user: userResponse, token });
 });
 
-// Update User password
-const updatePassword = catchAsyncError(async (req, res, next) => {
+const logoutUser = catchAsyncError(async (req, res, next) => {
+  try {
+    res.clearCookie("token", {
+      httpOnly: true,
+    });
+    return responseHandler(res, 200, "Logout successful");
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Password Management
+const updatePassword = catchAsyncError(async (req, res) => {
   const { email, password, newPassword } = req.body;
 
-  // Ensure required fields are provided
   if (!email || !password || !newPassword) {
     return responseHandler(res, 400, "All fields are required");
   }
 
-  // Fetch user and include password field
   const user = await User.findOne({ email }).select("+password");
   if (!user) {
     return responseHandler(res, 404, "User not found");
   }
 
-  // Compare old password
-  // console.log("User's current hashed password:", user.password);
   const isPasswordMatched = await decryptPassword(password, user.password);
-
   if (!isPasswordMatched) {
     return responseHandler(res, 401, "Old password is incorrect");
   }
 
-  // Validate new password length
   if (newPassword.length < 6) {
     return responseHandler(res, 400, "New password must be at least 6 characters long");
   }
 
-  // Encrypt and save the new password
   user.password = await encryptPassword(newPassword);
-  // console.log("Updated hashed password:", user.password);
   await user.save();
-
-  // Generate new token
   const token = createToken(user._id, user.role, user.email);
 
-  // Respond with updated user information
   return responseHandler(res, 200, "Password updated successfully", {
     token,
     user: {
@@ -119,17 +112,6 @@ const updatePassword = catchAsyncError(async (req, res, next) => {
   });
 });
 
-
-// Get User Details
-const getUserDetails = catchAsyncError(async (req, res) => {
-  validateId(req.user?.id);
-  const user = await User.findById(req.user.id).select("-password");
-  if (!user) return responseHandler(res, 404, "User not found");
-
-  return responseHandler(res, 200, "User found", { user });
-});
-
-// Forgot Password
 const forgotPassword = catchAsyncError(async (req, res) => {
   const user = await User.findOne({ email: req.body.email });
   if (!user) return responseHandler(res, 404, "User not found");
@@ -164,7 +146,6 @@ const forgotPassword = catchAsyncError(async (req, res) => {
   }
 });
 
-// Reset Password
 const resetPassword = catchAsyncError(async (req, res) => {
   const resetPasswordToken = crypto
     .createHash("sha256")
@@ -191,18 +172,26 @@ const resetPassword = catchAsyncError(async (req, res) => {
   user.resetPasswordTokenExpire = undefined;
   await user.save();
 
-  const token = createToken(user._id, user.role,user.email);
+  const token = createToken(user._id, user.role, user.email);
   return responseHandler(res, 200, "Password reset successfully", {
     token,
     user,
   });
 });
 
-// Get User by ID
+// User Information
+const getUserDetails = catchAsyncError(async (req, res) => {
+  validateId(req.user?.id);
+  const user = await User.findById(req.user.id).select("-password");
+  if (!user) return responseHandler(res, 404, "User not found");
+
+  return responseHandler(res, 200, "User found", { user });
+});
+
 const getUserById = catchAsyncError(async (req, res) => {
-  const { id } = req.query; // Check from query parameters
-  validateId(id); // Validate before proceeding
-  
+  const { id } = req.query;
+  validateId(id);
+
   const user = await User.findById(id).select(
     "-password -resetPasswordToken -resetPasswordTokenExpire"
   );
@@ -213,27 +202,7 @@ const getUserById = catchAsyncError(async (req, res) => {
   });
 });
 
-
-// Log Out
-const logoutUser = catchAsyncError(async (req, res, next) => {
-  try {
-    res.clearCookie("token", {
-      httpOnly: true, 
-      // secure: process.env.NODE_ENV === "production", // Only in HTTPS in production
-      // sameSite: "strict", // Mitigates CSRF attacks
-    });
-
-    // Send a success response
-    return responseHandler(res, 200, "Logout successful");
-  } catch (error) {
-    // Pass the error to the error handling middleware
-    return next(error);
-  }
-});
-
-
-//admin 
-// Get All Users
+// Admin Management
 const getAllUsers = catchAsyncError(async (req, res) => {
   const users = await User.find().select("-password");
   if (!users || users.length === 0) {
@@ -242,15 +211,14 @@ const getAllUsers = catchAsyncError(async (req, res) => {
   return responseHandler(res, 200, "Users fetched successfully", { users });
 });
 
-
 export {
   registerUser,
   logIn,
-  getUserDetails,
+  logoutUser,
   updatePassword,
   forgotPassword,
   resetPassword,
+  getUserDetails,
   getUserById,
-  logoutUser,
-  getAllUsers
+  getAllUsers,
 };

@@ -1,271 +1,223 @@
+// Import Section
+import User from "../data_models/userModels.js";
 import crypto from "crypto";
-import Product from "../data_models/productModels.js";
 import catchAsyncError from "../middleware/catchAsyncError.js";
-import generateUniqueSlug from "../middleware/generateUniqueSlugs.js";
+import { createToken } from "../middleware/jsonWebToken.js";
+import {
+  decryptPassword,
+  encryptPassword,
+} from "../middleware/passwordMiddleware.js";
+import SendEmail from "../middleware/sendEmail.js";
 import responseHandler from "../utils/responseHandler.js";
-import socketEvent from "../utils/socketEvent.js";
-import cloudinary from "../utils/cloudinarySetUp.js";
-import { CustomError } from "../middleware/errorHandler.js";
+import { forgotPasswordTemplate } from "../utils/emailTemplates.js";
 import validateId from "../middleware/mongoDbIdValidate.js";
-import mongoose from "mongoose";
 
-// Get All Products Without Filters - admin
-const allProducts = catchAsyncError(async (req, res, next) => {
-  // console.log(req.user);
-  const products = await Product.find()
-    // .select("-__v") // exclude the __v field
-    // .populate("seller", "name email"); // populate the seller field with specific fields
+// User Authentication
+const registerUser = catchAsyncError(async (req, res) => {
+  const { name, email, password, role = "user", address } = req.body;
 
-  // Log the products data to inspect it
-  // console.log("Fetched products:", products);
-
-  // Send the response back
-  responseHandler(res, 200, "All products fetched successfully.", { products });
-
-  // Log again after response
-  // console.log("Products sent in response:", products);
-});
-
-// admin own listed products
-const adminListedProducts = catchAsyncError(async (req, res, next) => {
-  const id = req.user.id;
-  const products = await Product.find({ seller: id }).select("-__v");
-  if (!products || products.length === 0) {
-    return responseHandler(res, 404, "No products found for this admin.");
-    
+  if (!name || !email || !password) {
+    return responseHandler(res, 400, "Name, email, and password are required");
   }
-  responseHandler(res, 200, "Products fetched successfully.", {
-    products: products,
+
+  const existingUser = await User.findOne({ email }).lean();
+  if (existingUser) {
+    return responseHandler(res, 409, "User already exists with this email");
+  }
+
+  const hashedPassword = await encryptPassword(password);
+  const newUser = new User({
+    name,
+    email,
+    password: hashedPassword,
+    role,
+    address,
+  });
+
+  await newUser.save();
+  const userObj = newUser.toObject();
+  delete userObj.password;
+
+  const token = createToken(userObj._id, userObj.role, userObj.email);
+  return responseHandler(res, 201, "User registered successfully", {
+    token,
+    user: userObj,
   });
 });
 
-// Create Product Handler - seller + admin
-const createProduct = catchAsyncError(async (req, res, next) => {
-  const { name, price, description, category, quantity, image } = req.body;
+const logIn = catchAsyncError(async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return responseHandler(res, 400, "Email and password are required");
+  }
 
-  if (
-    !name ||
-    !price ||
-    !description ||
-    !category ||
-    !quantity ||
-    !image ||
-    image.length === 0
-  ) {
+  const user = await User.findOne({ email }).select("-resetPasswordToken -resetPasswordTokenExpire");
+  if (!user || !(await decryptPassword(password, user.password))) {
+    return responseHandler(res, 401, "Invalid email or password");
+  }
+
+  const token = createToken(user._id, user.role, user.email);
+  const userResponse = user.toObject();
+  delete userResponse.password;
+
+  return responseHandler(res, 200, "Login successful", { user: userResponse, token });
+});
+
+const logoutUser = catchAsyncError(async (req, res, next) => {
+  try {
+    res.clearCookie("token", {
+      httpOnly: true,
+    });
+    return responseHandler(res, 200, "Logout successful");
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// Password Management
+const updatePassword = catchAsyncError(async (req, res) => {
+  const { email, password, newPassword } = req.body;
+
+  if (!email || !password || !newPassword) {
+    return responseHandler(res, 400, "All fields are required");
+  }
+
+  const user = await User.findOne({ email }).select("+password");
+  if (!user) {
+    return responseHandler(res, 404, "User not found");
+  }
+
+  const isPasswordMatched = await decryptPassword(password, user.password);
+  if (!isPasswordMatched) {
+    return responseHandler(res, 401, "Old password is incorrect");
+  }
+
+  if (newPassword.length < 6) {
+    return responseHandler(res, 400, "New password must be at least 6 characters long");
+  }
+
+  user.password = await encryptPassword(newPassword);
+  await user.save();
+  const token = createToken(user._id, user.role, user.email);
+
+  return responseHandler(res, 200, "Password updated successfully", {
+    token,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  });
+});
+
+const forgotPassword = catchAsyncError(async (req, res) => {
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) return responseHandler(res, 404, "User not found");
+
+  const resetToken = user.getResetPasswordToken();
+  await user.save({ validateBeforeSave: false });
+
+  const resetPasswordUrl = `${process.env.FRONTEND_URL}/password/reset/${resetToken}`;
+  const message = forgotPasswordTemplate(user.name, resetPasswordUrl);
+
+  try {
+    await SendEmail({
+      email: user.email,
+      subject: "Password Recovery",
+      message,
+      isHtml: true,
+    });
+    return responseHandler(
+      res,
+      200,
+      `Email sent to ${user.email} successfully`
+    );
+  } catch (error) {
+    user.resetPasswordToken = undefined;
+    user.resetPasswordTokenExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+    return responseHandler(
+      res,
+      500,
+      "Email could not be sent. Please try again later."
+    );
+  }
+});
+
+const resetPassword = catchAsyncError(async (req, res) => {
+  const resetPasswordToken = crypto
+    .createHash("sha256")
+    .update(req.params.resetToken)
+    .digest("hex");
+
+  const user = await User.findOne({
+    resetPasswordToken,
+    resetPasswordTokenExpire: { $gt: Date.now() },
+  });
+
+  if (!user) return responseHandler(res, 400, "Invalid token or token expired");
+
+  if (!req.body.password || req.body.password.length < 6) {
     return responseHandler(
       res,
       400,
-      "All fields are required, including at least one image."
+      "Password must be at least 6 characters long"
     );
   }
 
-  // Generate unique slug
-  let slug = await generateUniqueSlug(name);
-  const exists = await Product.exists({ slug });
-  if (exists) {
-    slug = `${slug}-${crypto.randomBytes(4).toString("hex")}`;
-  }
+  user.password = await encryptPassword(req.body.password);
+  user.resetPasswordToken = undefined;
+  user.resetPasswordTokenExpire = undefined;
+  await user.save();
 
-  // Create and save the product
-  const product = await Product.create({
-    name,
-    slug,
-    price,
-    description,
-    category,
-    quantity,
-    image,
-    seller: req.user.id, // Assuming the logged-in user is the seller
-  });
-
-  responseHandler(res, 201, "Product created successfully.", { product });
-});
-
-//seller
-const sellerListedProducts = catchAsyncError(async (req, res, next) => {
-  const id = req.user.id;
-  const products = await Product.find({ seller: id }).select("-__v");
-  responseHandler(res, 200, "Products fetched successfully.", {
-    products: products,
+  const token = createToken(user._id, user.role, user.email);
+  return responseHandler(res, 200, "Password reset successfully", {
+    token,
+    user,
   });
 });
 
-const deleteProductById = catchAsyncError(async (req, res, next) => {
-  const { productId } = req.params;
-  // console.log(productId);
-  if (!productId) {
-    return responseHandler(res, 400, "Product ID is required.");
-  }
+// User Information
+const getUserDetails = catchAsyncError(async (req, res) => {
+  validateId(req.user?.id);
+  const user = await User.findById(req.user.id).select("-password");
+  if (!user) return responseHandler(res, 404, "User not found");
 
-  const product = await Product.findById(productId);
-
-  if (!product) {
-    return responseHandler(res, 404, "Product not found.");
-  }
-  // console.log(req.user);
-  // Check if the user is the seller of the product or an admin
-  if (
-    product.seller.toString() !== req.user.id.toString() &&
-    req.user.role !== "admin"
-  ) {
-    return responseHandler(
-      res,
-      403,
-      "You are not authorized to delete this product."
-    );
-  }
-
-  // Delete the product image from Cloudinary if it exists
-  if (product.image?.publicId) {
-    await cloudinary.uploader.destroy(product.image.publicId);
-  }
-
-  await Product.findByIdAndDelete(productId);
-  responseHandler(res, 200, "Product deleted successfully.", { productId });
+  return responseHandler(res, 200, "User found", { user });
 });
 
-// Get Product by ID - seller + admin
-const getProductById = catchAsyncError(async (req, res, next) => {
-  const { productId } = req.params;
+const getUserById = catchAsyncError(async (req, res) => {
+  const { id } = req.query;
+  validateId(id);
 
+  const user = await User.findById(id).select(
+    "-password -resetPasswordToken -resetPasswordTokenExpire"
+  );
+  if (!user) return responseHandler(res, 404, "User not found");
 
-  // Fetch the product
-  const product = await Product.findById(productId);
-  if (!product) {
-    return responseHandler(res, 404, "Product not found.");
-  }
-
-  // Respond with the product
-  return responseHandler(res, 200, "Product fetched successfully.", { product });
+  return responseHandler(res, 200, "User details fetched successfully", {
+    user,
+  });
 });
 
-// Update Product - seller + admin
-const updateProduct = (io) =>
-  catchAsyncError(async (req, res, next) => {
-    const { productId } = req.params;
-
-    // Validate the product ID
-    try {
-      validateId(productId); // Assumes this throws an error if invalid
-    } catch (error) {
-      return responseHandler(res, 400, error.message || "Invalid Product ID.");
-    }
-
-    // Find the product by ID
-    const product = await Product.findById(productId);
-    // console.log("before update", product);
-    if (!product) {
-      return responseHandler(res, 404, "Product not found.");
-    }
-
-    const allowedUpdates = [
-      "name",
-      "description",
-      "price",
-      "quantity",
-      "image",
-      "category",
-    ];
-    const updates = req.body;
-
-    // console.log("1", updates.image?.publicId, req.body.image?.publicId);
-    // Check if the image needs to be updated
-    if (
-      updates.image?.publicId &&
-      product.image?.publicId &&
-      updates.image.publicId !== product.image.publicId
-    ) {
-      try {
-        // Delete the previous image using its publicId
-        await cloudinary.uploader.destroy(product.image.publicId);
-      } catch (err) {
-        console.error("Failed to delete the previous image:", err);
-        return responseHandler(res, 500, "Failed to delete the old image.");
-      }
-    }
-
-    // Update only allowed fields
-    Object.keys(updates).forEach((key) => {
-      if (allowedUpdates.includes(key)) {
-        product[key] = updates[key];
-      }
-    });
-
-    // Save the updated product
-    try {
-      let product2 = await product.save();
-      // console.log("after update", product2);
-    } catch (err) {
-      console.error("Error saving updated product:", err);
-      return responseHandler(res, 500, "Failed to update the product.");
-    }
-
-    // Emit product update via socket.io
-    socketEvent(io, "productUpdate", {
-      id: product._id,
-      ...product.toObject(),
-    });
-
-    // Respond with success
-    return responseHandler(res, 200, "Product updated successfully.", {
-      product,
-    });
-  });
-
-//  USER
-// Get All Products with Filters, Sorting, and Pagination
-const getAllProducts = catchAsyncError(async (req, res, next) => {
-  const {
-    category,
-    search,
-    minPrice,
-    maxPrice,
-    sort,
-    page = 1,
-    limit = 10,
-  } = req.query;
-
-  const query = {};
-  if (category) query.category = category;
-  if (search) query.name = new RegExp(search.replace(/-/g, " "), "i");
-  if (minPrice || maxPrice) {
-    query.price = {};
-    if (minPrice) query.price.$gte = Number(minPrice);
-    if (maxPrice) query.price.$lte = Number(maxPrice);
+// Admin Management
+const getAllUsers = catchAsyncError(async (req, res) => {
+  const users = await User.find().select("-password");
+  if (!users || users.length === 0) {
+    return responseHandler(res, 404, "No users found");
   }
-
-  const pageNumber = Number(page);
-  const perPage = Number(limit);
-  const skip = (pageNumber - 1) * perPage;
-
-  let sortOption = {};
-  if (sort === "price_asc") sortOption.price = 1;
-  if (sort === "price_desc") sortOption.price = -1;
-  if (sort === "newest") sortOption.createdAt = -1;
-
-  const products = await Product.find(query)
-    .sort(sortOption)
-    .skip(skip)
-    .limit(perPage)
-    .select("name price category image quantity description createdAt");
-
-  const productCount = await Product.countDocuments(query);
-
-  responseHandler(res, 200, "Products fetched successfully.", {
-    productCount,
-    totalPages: Math.ceil(productCount / perPage),
-    currentPage: pageNumber,
-    products,
-  });
+  return responseHandler(res, 200, "Users fetched successfully", { users });
 });
 
 export {
-  createProduct,
-  adminListedProducts,
-  getAllProducts,
-  allProducts,
-  getProductById,
-  updateProduct,
-  sellerListedProducts,
-  deleteProductById,
+  registerUser,
+  logIn,
+  logoutUser,
+  updatePassword,
+  forgotPassword,
+  resetPassword,
+  getUserDetails,
+  getUserById,
+  getAllUsers,
 };
